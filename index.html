@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Connections Game</title>
+    <!-- Using Tailwind Play CDN for reliable, robust rendering inside the preview -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom transitions for smooth grid shuffling and category reveals */
+        .grid-item {
+            transition: all 0.2s ease-in-out;
+        }
+        /* Color themes for solved categories matching NYT styling vibes */
+        .bg-cat-0 { background-color: #f9df6d; color: #000000; } /* Yellow */
+        .bg-cat-1 { background-color: #a0c35a; color: #000000; } /* Green */
+        .bg-cat-2 { background-color: #b0c4ef; color: #000000; } /* Blue */
+        .bg-cat-3 { background-color: #ba7cda; color: #ffffff; } /* Purple */
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-900 font-sans min-h-screen flex flex-col items-center justify-between p-4 pb-28 md:pb-12">
+
+    <!-- Header Navigation -->
+    <header class="w-full max-w-xl text-center py-4 border-b border-stone-200">
+        <h1 class="text-3xl font-extrabold tracking-tight font-serif">Connections</h1>
+        <p class="text-sm text-stone-500 mt-1">Create groups of four!</p>
+        
+        <!-- Navigation Tabs -->
+        <div class="flex justify-center gap-4 mt-4">
+            <button id="nav-play-btn" onclick="showGameView()" class="px-4 py-1.5 bg-stone-900 text-white text-xs font-bold rounded-full transition-all">
+                Play Game
+            </button>
+            <button id="nav-create-btn" onclick="showCreatorView()" class="px-4 py-1.5 bg-stone-200 text-stone-800 text-xs font-bold rounded-full hover:bg-stone-300 transition-all">
+                ✏️ Puzzle Creator
+            </button>
+        </div>
+    </header>
+
+    <!-- GAME VIEW CONTAINER -->
+    <main id="game-view" class="w-full max-w-xl flex-1 flex flex-col justify-center my-4 gap-6">
+        
+        <!-- Active Puzzle Header Indicator -->
+        <div class="text-center">
+            <span id="puzzle-source-indicator" class="inline-block px-3 py-1 bg-stone-200 text-stone-700 text-xs font-bold rounded-full uppercase tracking-wider">
+                Built-in Puzzle
+            </span>
+        </div>
+
+        <div id="solved-categories" class="flex flex-col gap-2 w-full"></div>
+
+        <!-- Removing fixed aspect-square from grid container so it can shrink vertically when rows are solved -->
+        <div id="word-grid" class="grid grid-cols-4 gap-2.5 w-full">
+            <!-- Word tiles will load here -->
+        </div>
+
+        <div class="flex items-center justify-center gap-3 text-sm font-medium text-stone-600">
+            <span>Mistakes remaining:</span>
+            <div id="mistake-dots" class="flex gap-2">
+                <!-- Dots will load here -->
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-3 w-full">
+            <button id="shuffle-btn" class="px-5 py-2.5 border border-stone-400 rounded-full text-sm font-semibold hover:bg-stone-100 active:bg-stone-200 transition-colors cursor-pointer">
+                Shuffle
+            </button>
+            <button id="deselect-btn" class="px-5 py-2.5 border border-stone-400 rounded-full text-sm font-semibold hover:bg-stone-100 active:bg-stone-200 transition-colors cursor-pointer">
+                Deselect All
+            </button>
+            <button id="submit-btn" class="px-6 py-2.5 bg-stone-900 text-white rounded-full text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-stone-800 active:bg-black transition-colors cursor-pointer" disabled>
+                Submit
+            </button>
+        </div>
+
+        <div class="flex justify-center gap-3 mt-2">
+            <button onclick="loadRandomPreset()" class="text-xs text-blue-700 font-bold hover:underline cursor-pointer">
+                🔄 Load Another Random Built-In Puzzle
+            </button>
+        </div>
+    </main>
+
+    <!-- CREATOR VIEW CONTAINER -->
+    <main id="creator-view" class="w-full max-w-xl flex-1 flex flex-col justify-center my-4 gap-6 hidden">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-stone-200">
+            <h2 class="text-xl font-serif font-bold text-stone-800 mb-2">Create Your Family Puzzle</h2>
+            <p class="text-xs text-stone-500 mb-6">Fill out the categories and words below to make your custom puzzle. You can play it instantly or copy a special sharing link!</p>
+            
+            <form id="custom-puzzle-form" onsubmit="handleCustomSubmit(event)" class="space-y-6">
+                <!-- Category 0: Yellow -->
+                <div class="p-4 bg-amber-50 rounded-xl border-l-8 border-amber-300 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-black text-amber-800 uppercase tracking-widest">Yellow (Easiest)</label>
+                        <span class="text-[10px] text-amber-600 font-medium">Category Name & 4 Words</span>
+                    </div>
+                    <input type="text" id="cat-title-0" required placeholder="e.g., PALINDROMES" class="w-full p-2 text-sm font-semibold rounded-lg border border-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-400 uppercase">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="cat-0-word-0" required placeholder="Word 1" class="p-2 text-xs font-medium rounded-lg border border-amber-200 uppercase">
+                        <input type="text" id="cat-0-word-1" required placeholder="Word 2" class="p-2 text-xs font-medium rounded-lg border border-amber-200 uppercase">
+                        <input type="text" id="cat-0-word-2" required placeholder="Word 3" class="p-2 text-xs font-medium rounded-lg border border-amber-200 uppercase">
+                        <input type="text" id="cat-0-word-3" required placeholder="Word 4" class="p-2 text-xs font-medium rounded-lg border border-amber-200 uppercase">
+                    </div>
+                </div>
+
+                <!-- Category 1: Green -->
+                <div class="p-4 bg-green-50 rounded-xl border-l-8 border-green-400 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-black text-green-800 uppercase tracking-widest">Green (Medium)</label>
+                        <span class="text-[10px] text-green-600 font-medium">Category Name & 4 Words</span>
+                    </div>
+                    <input type="text" id="cat-title-1" required placeholder="e.g., THINGS THAT FLASH" class="w-full p-2 text-sm font-semibold rounded-lg border border-green-200 focus:outline-none focus:ring-2 focus:ring-green-400 uppercase">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="cat-1-word-0" required placeholder="Word 1" class="p-2 text-xs font-medium rounded-lg border border-green-200 uppercase">
+                        <input type="text" id="cat-1-word-1" required placeholder="Word 2" class="p-2 text-xs font-medium rounded-lg border border-green-200 uppercase">
+                        <input type="text" id="cat-1-word-2" required placeholder="Word 3" class="p-2 text-xs font-medium rounded-lg border border-green-200 uppercase">
+                        <input type="text" id="cat-1-word-3" required placeholder="Word 4" class="p-2 text-xs font-medium rounded-lg border border-green-200 uppercase">
+                    </div>
+                </div>
+
+                <!-- Category 2: Blue -->
+                <div class="p-4 bg-blue-50 rounded-xl border-l-8 border-blue-400 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-black text-blue-800 uppercase tracking-widest">Blue (Harder)</label>
+                        <span class="text-[10px] text-blue-600 font-medium">Category Name & 4 Words</span>
+                    </div>
+                    <input type="text" id="cat-title-2" required placeholder="e.g., TYPES OF TREES" class="w-full p-2 text-sm font-semibold rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 uppercase">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="cat-2-word-0" required placeholder="Word 1" class="p-2 text-xs font-medium rounded-lg border border-blue-200 uppercase">
+                        <input type="text" id="cat-2-word-1" required placeholder="Word 2" class="p-2 text-xs font-medium rounded-lg border border-blue-200 uppercase">
+                        <input type="text" id="cat-2-word-2" required placeholder="Word 3" class="p-2 text-xs font-medium rounded-lg border border-blue-200 uppercase">
+                        <input type="text" id="cat-2-word-3" required placeholder="Word 4" class="p-2 text-xs font-medium rounded-lg border border-blue-200 uppercase">
+                    </div>
+                </div>
+
+                <!-- Category 3: Purple -->
+                <div class="p-4 bg-purple-50 rounded-xl border-l-8 border-purple-400 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-black text-purple-800 uppercase tracking-widest">Purple (Tricky)</label>
+                        <span class="text-[10px] text-purple-600 font-medium">Category Name & 4 Words</span>
+                    </div>
+                    <input type="text" id="cat-title-3" required placeholder="e.g., WORDS BEFORE 'JACK'" class="w-full p-2 text-sm font-semibold rounded-lg border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-400 uppercase">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="cat-3-word-0" required placeholder="Word 1" class="p-2 text-xs font-medium rounded-lg border border-purple-200 uppercase">
+                        <input type="text" id="cat-3-word-1" required placeholder="Word 2" class="p-2 text-xs font-medium rounded-lg border border-purple-200 uppercase">
+                        <input type="text" id="cat-3-word-2" required placeholder="Word 3" class="p-2 text-xs font-medium rounded-lg border border-purple-200 uppercase">
+                        <input type="text" id="cat-3-word-3" required placeholder="Word 4" class="p-2 text-xs font-medium rounded-lg border border-purple-200 uppercase">
+                    </div>
+                </div>
+
+                <!-- Action Panel -->
+                <div class="flex flex-col gap-3 pt-2">
+                    <button type="submit" class="w-full py-3 bg-stone-900 text-white font-bold rounded-full hover:bg-stone-800 active:bg-black transition-all cursor-pointer">
+                        🎮 Play This Puzzle Instantly
+                    </button>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" onclick="copyShareLink()" class="py-2.5 bg-indigo-600 text-white text-xs font-bold rounded-full hover:bg-indigo-700 active:bg-indigo-800 transition-all cursor-pointer">
+                            🔗 Copy Share Link
+                        </button>
+                        <button type="button" onclick="loadSampleCreatorData()" class="py-2.5 bg-stone-200 text-stone-800 text-xs font-bold rounded-full hover:bg-stone-300 transition-all cursor-pointer">
+                            🪄 Autofill Sample
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer class="w-full max-w-xl text-center py-2 text-xs text-stone-400">
+        Custom Puzzle Editor Mode • Made for Family Game Night
+    </footer>
+
+    <!-- Toast Alert Notifications -->
+    <div id="toast" class="fixed top-24 left-1/2 -translate-x-1/2 bg-stone-900 text-stone-100 px-4 py-2 rounded-lg shadow-lg text-sm font-medium tracking-wide opacity-0 transition-opacity duration-300 pointer-events-none z-50">
+        One away...
+    </div>
+
+    <!-- Win/Loss End Game Modal -->
+    <div id="game-modal" class="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-2xl border border-stone-100 animate-in fade-in zoom-in-95 duration-200">
+            <div id="modal-icon" class="text-5xl mb-3">🏆</div>
+            <h2 id="modal-title" class="text-2xl font-bold font-serif mb-2">Splendid!</h2>
+            <p id="modal-body" class="text-stone-600 text-sm mb-6">You cracked the puzzle perfectly.</p>
+            
+            <div id="modal-reveal-list" class="flex flex-col gap-2 mb-6 text-left text-xs font-bold">
+                <!-- Reveals load here -->
+            </div>
+
+            <button id="restart-btn" class="w-full py-3 bg-stone-950 text-white rounded-full font-semibold hover:bg-stone-800 transition-colors cursor-pointer">
+                Play Again / Reset
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ========================================================
+        // PRESET BUILT-IN PUZZLES (For generating random ones)
+        // ========================================================
+        const BUILTIN_PUZZLES = [
+            [
+                { category: "PALINDROMES", words: ["KAYAK", "RACECAR", "RADAR", "NOON"], difficulty: 0 },
+                { category: "THINGS THAT FLASH", words: ["LIGHTNING", "CAMERA", "FIREFLY", "BEACON"], difficulty: 1 },
+                { category: "TYPES OF TREES", words: ["OAK", "PINE", "MAPLE", "BIRCH"], difficulty: 2 },
+                { category: "WORDS BEFORE 'JACK'", words: ["FLAP", "LUMBER", "BLACK", "APPLE"], difficulty: 3 }
+            ],
+            [
+                { category: "BOARD GAMES", words: ["CHESS", "MONOPOLY", "CLUE", "RISK"], difficulty: 0 },
+                { category: "INTERNET TECH", words: ["BYTE", "CACHE", "COOKIE", "MODEM"], difficulty: 1 },
+                { category: "FOOTWEAR", words: ["BOOT", "SNEAKER", "LOAFER", "SANDAL"], difficulty: 2 },
+                { category: "WORDS BEFORE 'CHIP'", words: ["POTATO", "MICRO", "POKER", "BLUE"], difficulty: 3 }
+            ],
+            [
+                { category: "YELLOW THINGS", words: ["BANANA", "LEMON", "BUS", "CORN"], difficulty: 0 },
+                { category: "CREATIVE HOBBIES", words: ["PAINTING", "ORIGAMI", "KNITTING", "DANCING"], difficulty: 1 },
+                { category: "MEASUREMENTS", words: ["INCH", "MILE", "LITER", "GRAM"], difficulty: 2 },
+                { category: "PALACE OF ___", words: ["VERSAILLES", "CARDS", "JUSTICE", "GOLD"], difficulty: 3 }
+            ],
+            [
+                { category: "KITCHEN UTENSILS", words: ["FORK", "SPOON", "KNIFE", "WHISK"], difficulty: 0 },
+                { category: "MAMMALS", words: ["WHALE", "DOLPHIN", "BAT", "HUMAN"], difficulty: 1 },
+                { category: "GREEN VEGETABLES", words: ["BROCCOLI", "SPINACH", "PEAS", "CELERY"], difficulty: 2 },
+                { category: "THINGS WITH WINGS", words: ["AIRPLANE", "ANGEL", "BUTTERFLY", "STAGE"], difficulty: 3 }
+            ]
+        ];
+
+        // Active puzzle tracking
+        let PUZZLE_DATA = [...BUILTIN_PUZZLES[0]];
+        let currentPuzzleName = "Built-in Puzzle";
+
+        // State variables tracking game progress
+        let activeWords = [];         // Array of string objects currently on grid
+        let selectedWords = [];       // Array of up to 4 selected string words
+        let solvedCategories = [];    // Track categories completed
+        let mistakesRemaining = 4;
+        let pastGuesses = new Set();  // Remember sorted guess tuples to catch duplicates
+
+        // DOM elements cache
+        const gridElement = document.getElementById('word-grid');
+        const solvedContainer = document.getElementById('solved-categories');
+        const mistakeDotsContainer = document.getElementById('mistake-dots');
+        const submitBtn = document.getElementById('submit-btn');
+        const deselectBtn = document.getElementById('deselect-btn');
+        const shuffleBtn = document.getElementById('shuffle-btn');
+        const toastElement = document.getElementById('toast');
+        const gameModal = document.getElementById('game-modal');
+        const restartBtn = document.getElementById('restart-btn');
+        const puzzleSourceIndicator = document.getElementById('puzzle-source-indicator');
+
+        // Nav views
+        function showGameView() {
+            document.getElementById('game-view').classList.remove('hidden');
+            document.getElementById('creator-view').classList.add('hidden');
+            
+            document.getElementById('nav-play-btn').className = "px-4 py-1.5 bg-stone-900 text-white text-xs font-bold rounded-full transition-all";
+            document.getElementById('nav-create-btn').className = "px-4 py-1.5 bg-stone-200 text-stone-800 text-xs font-bold rounded-full hover:bg-stone-300 transition-all";
+        }
+
+        function showCreatorView() {
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('creator-view').classList.remove('hidden');
+
+            document.getElementById('nav-play-btn').className = "px-4 py-1.5 bg-stone-200 text-stone-800 text-xs font-bold rounded-full hover:bg-stone-300 transition-all";
+            document.getElementById('nav-create-btn').className = "px-4 py-1.5 bg-stone-900 text-white text-xs font-bold rounded-full transition-all";
+        }
+
+        // Map lookup helper: Find which category object a specific word belongs to
+        function getWordMetadata(word) {
+            return PUZZLE_DATA.find(cat => cat.words.includes(word));
+        }
+
+        // Setup a clean board state
+        function initGame() {
+            activeWords = [];
+            selectedWords = [];
+            solvedCategories = [];
+            mistakesRemaining = 4;
+            pastGuesses.clear();
+
+            // Set UI Source text
+            puzzleSourceIndicator.textContent = currentPuzzleName;
+
+            // Flatten all puzzle words into single array
+            PUZZLE_DATA.forEach(cat => {
+                activeWords.push(...cat.words);
+            });
+
+            // Wipe layout clear
+            solvedContainer.innerHTML = '';
+            gameModal.classList.add('hidden');
+            
+            shuffle(activeWords);
+            renderBoard();
+            updateControls();
+        }
+
+        // Basic Array Shuffle algorithm
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // Load a randomized preset puzzle
+        function loadRandomPreset() {
+            let nextIndex = Math.floor(Math.random() * BUILTIN_PUZZLES.length);
+            // Quick check to avoid picking the same built-in puzzle if we can
+            PUZZLE_DATA = [...BUILTIN_PUZZLES[nextIndex]];
+            currentPuzzleName = `Built-In Puzzle #${nextIndex + 1}`;
+            initGame();
+            showToast(`Loaded Built-In Puzzle #${nextIndex + 1}!`);
+        }
+
+        // Render functions keeping UI synced with state array values
+        function renderBoard() {
+            // Render active choice tiles inside grid layout
+            gridElement.innerHTML = '';
+            
+            // Note: Grid rows are now handled naturally without hardcoded templates so cells can stay square
+
+            activeWords.forEach(word => {
+                const isSelected = selectedWords.includes(word);
+                
+                const btn = document.createElement('button');
+                btn.textContent = word;
+                // Added aspect-square class to the buttons and tweaked padding/flex centering to guarantee perfect square shapes
+                btn.className = `grid-item aspect-square flex items-center justify-center text-center p-1 rounded-lg font-bold tracking-wide break-all select-none cursor-pointer text-[10px] sm:text-xs md:text-sm border transition-all duration-200 uppercase ${
+                    isSelected 
+                    ? 'bg-stone-700 text-white border-stone-700 font-extrabold scale-95 shadow-inner' 
+                    : 'bg-stone-200/80 hover:bg-stone-300/70 border-transparent text-stone-800'
+                }`;
+                
+                btn.addEventListener('click', () => handleWordClick(word));
+                gridElement.appendChild(btn);
+            });
+
+            // Render Mistake Token Counter (Filled vs Empty Dots)
+            mistakeDotsContainer.innerHTML = '';
+            for (let i = 0; i < 4; i++) {
+                const dot = document.createElement('div');
+                dot.className = `w-3 h-3 rounded-full transition-all duration-300 ${
+                    i < mistakesRemaining ? 'bg-stone-700 scale-100' : 'bg-stone-200 border border-stone-300 scale-75'
+                }`;
+                mistakeDotsContainer.appendChild(dot);
+            }
+        }
+
+        // Toggle state selection arrays upon clicking tile elements
+        function handleWordClick(word) {
+            const index = selectedWords.indexOf(word);
+            if (index > -1) {
+                // Deselect word if clicked again
+                selectedWords.splice(index, 1);
+            } else {
+                // Select word if room permits up to maximum of 4 allocations
+                if (selectedWords.length < 4) {
+                    selectedWords.push(word);
+                }
+            }
+            renderBoard();
+            updateControls();
+        }
+
+        // Button operational updates
+        function updateControls() {
+            submitBtn.disabled = selectedWords.length !== 4;
+            deselectBtn.disabled = selectedWords.length === 0;
+        }
+
+        // Fire temporary status alert notices on screen
+        function showToast(message) {
+            toastElement.textContent = message;
+            toastElement.classList.remove('opacity-0');
+            toastElement.classList.add('opacity-100');
+            
+            setTimeout(() => {
+                toastElement.classList.remove('opacity-100');
+                toastElement.classList.add('opacity-0');
+            }, 2500);
+        }
+
+        // Handle submission guess logic verification matches
+        function submitGuess() {
+            if (selectedWords.length !== 4) return;
+
+            // Generate deterministic string key tracking if exact group combo was attempted before
+            const guessKey = [...selectedWords].sort().join('|');
+            if (pastGuesses.has(guessKey)) {
+                showToast("Already guessed!");
+                return;
+            }
+            pastGuesses.add(guessKey);
+
+            // Extract the underlying target groups each word belongs to
+            const matches = selectedWords.map(w => getWordMetadata(w));
+            const primaryCategory = matches[0];
+            
+            // Check structural conformity: do all elements reference the same parent group index?
+            const isCorrect = matches.every(m => m && m.category === primaryCategory.category);
+
+            if (isCorrect) {
+                // SUCCESS MATCH MATCHED!
+                solvedCategories.push(primaryCategory);
+                
+                // Remove matched set from the main active pools
+                activeWords = activeWords.filter(w => !selectedWords.includes(w));
+                
+                // Append absolute answer row banners visually
+                appendSolvedBanner(primaryCategory);
+                
+                // Reset selections state clear
+                selectedWords = [];
+                renderBoard();
+                updateControls();
+
+                // Win validation state trigger checking
+                if (solvedCategories.length === 4) {
+                    setTimeout(() => triggerEndGame(true), 600);
+                }
+            } else {
+                // FALSE COMBINATION - Calculate similarity depth matches for 'One Away' notifications
+                const categoryCounts = {};
+                matches.forEach(m => {
+                    if(m) categoryCounts[m.category] = (categoryCounts[m.category] || 0) + 1;
+                });
+
+                const maxMatchingInSameGroup = Math.max(...Object.values(categoryCounts));
+                
+                mistakesRemaining--;
+                renderBoard();
+                updateControls();
+
+                if (mistakesRemaining === 0) {
+                    setTimeout(() => triggerEndGame(false), 600);
+                } else if (maxMatchingInSameGroup === 3) {
+                    showToast("One away...");
+                } else {
+                    showToast("Next time...");
+                }
+            }
+        }
+
+        // Insert full screen visual row updates rendering matched sets beautifully
+        function appendSolvedBanner(catObj) {
+            const banner = document.createElement('div');
+            banner.className = `bg-cat-${catObj.difficulty} w-full py-4 px-2 rounded-xl text-center flex flex-col items-center justify-center font-bold tracking-wide animate-in fade-in slide-in-from-top-2 duration-300`;
+            
+            const title = document.createElement('div');
+            title.className = "text-xs font-bold tracking-widest opacity-80 mb-0.5 uppercase";
+            title.textContent = catObj.category;
+
+            const wordsList = document.createElement('div');
+            wordsList.className = "text-sm sm:text-base font-extrabold uppercase tracking-wider";
+            wordsList.textContent = catObj.words.join(', ');
+
+            banner.appendChild(title);
+            banner.appendChild(wordsList);
+            solvedContainer.appendChild(banner);
+        }
+
+        // Final modal completion routines
+        function triggerEndGame(didWin) {
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const modalIcon = document.getElementById('modal-icon');
+            const revealList = document.getElementById('modal-reveal-list');
+            
+            revealList.innerHTML = '';
+
+            if (didWin) {
+                modalIcon.textContent = "🏆";
+                modalTitle.textContent = "Outstanding!";
+                modalBody.textContent = "You found all four matching connections categories perfectly.";
+            } else {
+                modalIcon.textContent = "💥";
+                modalTitle.textContent = "Nice Try!";
+                modalBody.textContent = "You ran out of moves. Here were the correct groupings:";
+                
+                // Print answers key out on screen explicitly
+                PUZZLE_DATA.forEach(cat => {
+                    const row = document.createElement('div');
+                    row.className = `p-2 rounded bg-cat-${cat.difficulty} flex flex-col gap-0.5 my-1 text-stone-900`;
+                    row.innerHTML = `<span class="opacity-70 text-[10px] tracking-wider uppercase font-extrabold">${cat.category}</span><span class="font-bold">${cat.words.join(', ')}</span>`;
+                    revealList.appendChild(row);
+                });
+            }
+
+            gameModal.classList.remove('hidden');
+        }
+
+        // ========================================================
+        // PUZZLE CREATOR LOGIC & SHARING
+        // ========================================================
+        function loadSampleCreatorData() {
+            const samples = [
+                { title: "FRUITS", words: ["APPLE", "ORANGE", "BANANA", "GRAPE"] },
+                { title: "CAR BRANDS", words: ["FORD", "TESLA", "TOYOTA", "HONDA"] },
+                { title: "OCEANS", words: ["PACIFIC", "ATLANTIC", "INDIAN", "ARCTIC"] },
+                { title: "THINGS ON A DESK", words: ["LAMP", "PEN", "LAPTOP", "NOTEPAD"] }
+            ];
+            
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`cat-title-${i}`).value = samples[i].title;
+                for (let j = 0; j < 4; j++) {
+                    document.getElementById(`cat-${i}-word-${j}`).value = samples[i].words[j];
+                }
+            }
+            showToast("Autofilled sample data!");
+        }
+
+        // Pulls custom input and constructs a puzzle configuration
+        function compileCustomPuzzleFromForm() {
+            const customData = [];
+            const uniqueWords = new Set();
+            
+            for (let i = 0; i < 4; i++) {
+                const categoryTitle = document.getElementById(`cat-title-${i}`).value.trim().toUpperCase();
+                const words = [];
+                for (let j = 0; j < 4; j++) {
+                    const wordVal = document.getElementById(`cat-${i}-word-${j}`).value.trim().toUpperCase();
+                    if (!wordVal) return null;
+                    words.push(wordVal);
+                    uniqueWords.add(wordVal);
+                }
+                
+                if (!categoryTitle) return null;
+                
+                customData.push({
+                    category: categoryTitle,
+                    words: words,
+                    difficulty: i
+                });
+            }
+
+            // Check for exactly 16 words (no duplicate words allowed)
+            if (uniqueWords.size !== 16) {
+                showToast("All 16 words must be unique!");
+                return null;
+            }
+
+            return customData;
+        }
+
+        function handleCustomSubmit(e) {
+            e.preventDefault();
+            const compiled = compileCustomPuzzleFromForm();
+            if (!compiled) return;
+
+            PUZZLE_DATA = compiled;
+            currentPuzzleName = "Custom Family Puzzle";
+            initGame();
+            showGameView();
+            showToast("Your custom puzzle is live! Go play!");
+        }
+
+        // Copies encoded link to clipboard for messaging to family members
+        function copyShareLink() {
+            const compiled = compileCustomPuzzleFromForm();
+            if (!compiled) {
+                showToast("Please fill out all 16 words & 4 categories before copying link.");
+                return;
+            }
+
+            try {
+                // Serialize custom data structure to compressed base64 hash parameter
+                const rawString = JSON.stringify(compiled);
+                const b64 = btoa(encodeURIComponent(rawString));
+                const shareUrl = `${window.location.origin}${window.location.pathname}?puzzle=${b64}`;
+                
+                // Modern clipboard API fallback guard
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(shareUrl).then(() => {
+                        showToast("Link Copied! Text it to your family!");
+                    });
+                } else {
+                    // Fallback for isolated canvas runtimes
+                    const tempInput = document.createElement("input");
+                    tempInput.value = shareUrl;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(tempInput);
+                    showToast("Link Copied! Text it to your family!");
+                }
+            } catch (err) {
+                showToast("Failed to generate link.");
+            }
+        }
+
+        // Check if there is a custom shared puzzle loaded in URL parameters on start
+        function checkURLParameters() {
+            const params = new URLSearchParams(window.location.search);
+            const encodedPuzzle = params.get("puzzle");
+            if (encodedPuzzle) {
+                try {
+                    const decoded = JSON.parse(decodeURIComponent(atob(encodedPuzzle)));
+                    if (decoded && decoded.length === 4) {
+                        PUZZLE_DATA = decoded;
+                        currentPuzzleName = "Shared Family Puzzle";
+                        showToast("Successfully loaded shared puzzle!");
+                    }
+                } catch (e) {
+                    console.error("Invalid shared puzzle link structure:", e);
+                }
+            }
+        }
+
+        // Setup event action connection hooks
+        shuffleBtn.addEventListener('click', () => {
+            shuffle(activeWords);
+            renderBoard();
+        });
+
+        deselectBtn.addEventListener('click', () => {
+            selectedWords = [];
+            renderBoard();
+            updateControls();
+        });
+
+        submitBtn.addEventListener('click', submitGuess);
+        restartBtn.addEventListener('click', initGame);
+
+        // Bootstrap load sequence init run
+        checkURLParameters();
+        initGame();
+    </script>
+</body>
+</html>
